@@ -6,7 +6,7 @@
 # modification: 2018/08/03
 ########################################################################
 from PCF8574 import PCF8574_GPIO
-from Adafruit_LCD1602 import Adafruit_CharLCD
+from ADAFruit_LCD1602 import Adafruit_CharLCD
 
 from time import sleep, strftime
 from datetime import datetime

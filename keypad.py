@@ -215,6 +215,14 @@ def loop():
             print("You Pressed Key : %c " % (key))
 
 
+def start_keypad():
+    try:
+        loop()
+    except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, the child program destroy() will be  executed.
+        pass
+        GPIO.cleanup()
+
+
 if __name__ == '__main__':  # Program start from here
     print("Program is starting ... ")
     try:
