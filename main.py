@@ -48,13 +48,14 @@ def loop():
     while (True):
         key = keypad.getKey()  # obtain the state of keys
         if (key != keypad.NULL):  # if there is key pressed, print its key code.
-            print("You Pressed Key : %c " % (key))
             lcd.setCursor(0, 0)  # set cursor position
-
+            stringArray.append(str(key))
+            string = ""
             for a in stringArray:
                 string += str(a)
-            print(string)
+            lcd.clear()
             lcd.message(string + '\n')  # display CPU temperature
+
 
 
 if __name__ == '__main__':  # Program start from here
@@ -63,3 +64,5 @@ if __name__ == '__main__':  # Program start from here
         loop()
     except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, exit the program.
         GPIO.cleanup()
+    finally:
+        lcd.clear()
