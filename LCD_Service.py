@@ -34,7 +34,6 @@ class LCD:
         cols_pins = [31, 33, 35, 37]
         return Keypad(keys, rows_pins, cols_pins, rows, cols)
 
-
     def loop(self):
         self.keypad.setDebounceTime(50)
         self.lcd[1].output(3, 1)
@@ -50,6 +49,9 @@ class LCD:
                     string += str(a)
                 self.lcd[0].clear()
                 self.lcd[0].message(string + '\n')
+
+    def start_timer(self, sec):
+        timer(sec)
 
     def clear(self):
         self.lcd[0].clear()

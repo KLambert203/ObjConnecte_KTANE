@@ -7,13 +7,15 @@
 ########################################################################
 import RPi.GPIO as GPIO
 from LCD_Service import LCD
+import threading
 
 lcd_service = LCD()
 
 if __name__ == '__main__':
     print("Program is starting ... ")
     try:
-        lcd_service.loop()
+        threading.Thread(target=lcd_service.loop, args=()).start()
+        threading.Thread(target=lcd_service.start_timer, args=(60,)).start()
 
     except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, exit the program.
         GPIO.cleanup()
