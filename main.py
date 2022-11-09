@@ -16,6 +16,8 @@ if __name__ == '__main__':
     try:
         threading.Thread(target=lcd_service.loop, args=()).start()
         threading.Thread(target=lcd_service.start_timer, args=(60,)).start()
+        threading.Thread(target=lcd_service.life, args=()).start()
+
 
     except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, exit the program.
         GPIO.cleanup()
