@@ -13,7 +13,6 @@ pwr_indicator = 27
 pattern = []
 lights = [red, yellow, green, blue]
 module_is_active = False
-game = False
 server_ip_addr = "10.4.1.43"
 
 GPIO.setmode(GPIO.BCM)
@@ -28,18 +27,13 @@ GPIO.setup(17, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(22, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-
-def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
-    client.subscribe("Game/Module/Simon/IsActive", qos=1)
-    client.subscribe("Game/Module/Simon/Fail", qos=1)
-    client.subscribe("Game/Module/Simon/Success", qos=1)
-
-
-def on_message(client, userdata, msg):
-    module_is_active = msg
-    print(module_is_active)
+GPIO.output(yellow, GPIO.LOW)
+GPIO.output(red, GPIO.LOW)
+GPIO.output(green, GPIO.LOW)
+GPIO.output(blue, GPIO.LOW)
+GPIO.output(pwr_indicator, GPIO.LOW)
+client = paho.Client(client_id="simon", clean_session=False)
+client.connect(server_ip_addr, 1883, 60)
 
 
 def game_over():
@@ -66,22 +60,11 @@ def flash(color):
     GPIO.output(lights[color], GPIO.LOW)
 
 
-client = paho.Client(client_id="simon", clean_session=False)
-client.on_connect = on_connect
-client.on_message = on_message
-client.connect(server_ip_addr, 1883, 60)
-
-GPIO.output(yellow, GPIO.LOW)
-GPIO.output(red, GPIO.LOW)
-GPIO.output(green, GPIO.LOW)
-GPIO.output(blue, GPIO.LOW)
-GPIO.output(pwr_indicator, GPIO.LOW)
-
 while True:
     module_is_active = str(sub.simple("game/modules/Simon/isActive", hostname=server_ip_addr).payload, "utf-8")
-    print(module_is_active)
+    fail = str(sub.simple("game/modules/Simon/Fail", hostname=server_ip_addr).payload, "utf-8")
 
-    if module_is_active == "True":
+    if module_is_active == "True" and fail == "False":
         alive = True
         GPIO.output(pwr_indicator, GPIO.HIGH)
 
