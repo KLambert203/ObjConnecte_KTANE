@@ -8,11 +8,28 @@
 import GameManager
 
 manager = GameManager.GameManager("10.4.1.43", 1883, [])
+manager.game_modules = ["Simon", "Keypad"]
+
+def start_game(input_choice):
+    if input_choice == "S":
+        print("Game has started. Timer set to 3 minutes!")
+        print("Good luck!")
+        manager.start_game()
+        #manager.manage_game()
+    elif input_choice == "E":
+        print("Game has ended. Thanks for playing!")
+        manager.end_game()
+        exit(0)
+    else:
+        print("Command not recognized.")
+
 
 def loop():
-    manager.start_game()
+    print("Press S to start game.")
+    print("Press E to end game.")
     while True:
-        print("hello world \r")
+        start_game(input())
+
 
 
 if __name__ == '__main__':  # Program start from here
