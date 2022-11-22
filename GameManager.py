@@ -13,6 +13,7 @@ class GameManager:
 
     def start_game(self):
         self.connect_to_broker()
+        self.mqttc.publish("game/hasBeenWon", False, 2, True)
         self.mqttc.publish("game/lives", 3, 1, True)
         self.mqttc.publish("game/isStarted", True, 1, True)
         self.mqttc.publish("game/timer", 180, 1, True)
@@ -50,3 +51,16 @@ class GameManager:
         updated_lives = current_lives - 1
         self.mqttc.publish("game/lives", updated_lives, 1, True)
 
+    def win_module(self):
+        if self.module_index + 1 > len(self.game_modules):
+            self.win_game()
+        won_module = "game/modules/" + self.game_modules[self.module_index] + "/isActive"
+        new_module = "game/modules/" + self.game_modules[self.module_index + 1] + "/isActive"
+        self.module_index += 1
+        self.mqttc.publish(won_module, False, 1, True)
+        self.mqttc.publish(new_module, True, 1, True)
+
+    def win_game(self):
+        self.mqttc.publish("game/hasBeenWon", True, 2, True)
+        print("Congratulations! You have won the game!")
+        self.end_game()
