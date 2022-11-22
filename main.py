@@ -14,9 +14,9 @@ lcd_service = LCD()
 if __name__ == '__main__':
     print("Program is starting ... ")
     try:
-        threading.Thread(target=lcd_service.loop, args=()).start()
         threading.Thread(target=lcd_service.start_timer, args=(60,)).start()
-        threading.Thread(target=lcd_service.life, args=()).start()
+        threading.Thread(target=lcd_service.run, args=()).start()
+        threading.Thread(target=lcd_service.loop, args=()).start()
 
 
     except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, exit the program.

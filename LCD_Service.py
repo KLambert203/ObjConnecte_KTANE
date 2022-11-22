@@ -1,8 +1,7 @@
 from keypad import Keypad
 from PCF8574 import PCF8574_GPIO
 from ADAFruit_LCD1602 import Adafruit_CharLCD
-import paho.mqtt.client as mqtt
-import paho.mqtt.subscribe as subscribe
+import paho.mqtt.client as mqtt_client
 import time
 
 class LCD:
@@ -11,6 +10,8 @@ class LCD:
         self.keypad = self.init_keypad()
         self.time_format = None
         self.lives = None
+        self.mqttc = None
+        self.is_started = False
 
     def init_chips(self):
         PCF8574_address = 0x27  # I2C address of the PCF8574 chip.
@@ -44,29 +45,29 @@ class LCD:
         self.lcd[0].begin(16, 2)
         string_array = []
 
-
         while True:
             key = self.keypad.getKey()
+
             self.lcd[0].setCursor(0, 0)
             self.lcd[0].message(self.time_format)
-            self.lcd[0].setCursor(13, 0)
-            self.lcd[0].message(self.lives)
+            self.lcd[0].message('\n' + "Enter code: ")
+
+            if self.lives is not None:
+                self.lcd[0].setCursor(9, 0)
+                self.lcd[0].message(self.lives + " lives")
 
             if key != self.keypad.NULL:
                 string_array.append(str(key))
                 string = ""
                 for a in string_array:
                     string += str(a)
-                self.lcd[0].message('\n' + string)
-                print(len(string))
-                if len(string) > 4:
-                    if string == "1234":
+                self.lcd[0].message('\n' + "Enter code: " + string)
+                if str(key) == "#":
+                    if string == "1234#":
                         print("win")
                     self.lcd[0].clear()
                     string_array.clear()
                     string = ""
-
-
 
     def start_timer(self, sec):
         while sec:
@@ -74,13 +75,38 @@ class LCD:
             self.time_format = '{:02d}:{:02d}'.format(minute, second)
             time.sleep(1)
             sec -= 1
+        if sec == 0:
+            print("termine")
+            self.time_format = '{:02d}:{:02d}'.format(0, 0)
 
-    def life(self):
-        client = mqtt.Client("Display", False)
-        client.connect("10.4.1.43", 1883, 60, "")
-        while True:
-            self.lives = subscribe.simple("game/lives", "10.4.1.43", qos=0)
-            time.sleep(0.5)
+    def connect_mqtt(self) -> mqtt_client:
+        def on_connect(client, userdata, flags, rc):
+            if rc == 0:
+                print("Connected to MQTT Broker!")
+            else:
+                print("Failed to connect, return code %d\n", rc)
+
+        client = mqtt_client.Client("manager")
+        client.on_connect = on_connect
+        client.connect("10.4.1.43", 1883)
+        return client
+
+    def subscribe(self, client: mqtt_client):
+        def on_message(client, userdata, msg):
+            print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
+            if msg.topic == "game/lives":
+                self.lives = msg.payload.decode()
+            if msg.topic == "game/isStarted":
+                self.is_started = msg.payload.decode()
+
+        client.subscribe("game/lives")
+        client.subscribe("game/isStarted")
+        client.on_message = on_message
+
+    def run(self):
+        client = self.connect_mqtt()
+        self.subscribe(client)
+        client.loop_forever()
 
     def clear(self):
         self.lcd[0].clear()
