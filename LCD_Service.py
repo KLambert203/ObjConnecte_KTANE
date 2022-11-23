@@ -2,7 +2,9 @@ from keypad import Keypad
 from PCF8574 import PCF8574_GPIO
 from ADAFruit_LCD1602 import Adafruit_CharLCD
 import paho.mqtt.client as mqtt_client
+import threading
 import time
+import asyncio
 
 class LCD:
     def __init__(self):
@@ -69,29 +71,33 @@ class LCD:
                     string_array.clear()
                     string = ""
 
-    def start_timer(self, sec):
-        while sec:
-            minute, second = divmod(sec, 60)
-            self.time_format = '{:02d}:{:02d}'.format(minute, second)
-            time.sleep(1)
-            sec -= 1
-        if sec == 0:
-            print("termine")
-            self.time_format = '{:02d}:{:02d}'.format(0, 0)
-
-    def connect_mqtt(self) -> mqtt_client:
-        def on_connect(client, userdata, flags, rc):
-            if rc == 0:
-                print("Connected to MQTT Broker!")
+    def start_timer(self, sec, client):
+        print(self.is_started)
+        while True:
+            if self.is_started == "True":
+                while sec:
+                    minute, second = divmod(sec, 60)
+                    self.time_format = '{:02d}:{:02d}'.format(minute, second)
+                    client.publish("game/timer", sec, 1, True)
+                    time.sleep(1)
+                    sec -= 1
+                if sec == 0:
+                    print("termine")
+                    self.time_format = '{:02d}:{:02d}'.format(0, 0)
+                    client.publish("game/timer", 0, 1, True)
+                    break
             else:
-                print("Failed to connect, return code %d\n", rc)
+                self.time_format = '--:--'
 
-        client = mqtt_client.Client("manager")
-        client.on_connect = on_connect
-        client.connect("10.4.1.43", 1883)
-        return client
 
-    def subscribe(self, client: mqtt_client):
+
+
+    def connect_mqtt(self):
+        def on_connect(client, userdata, flags, rc):
+            print("Connected with result code " + str(rc))
+            client.subscribe("game/lives")
+            client.subscribe("game/isStarted")
+
         def on_message(client, userdata, msg):
             print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
             if msg.topic == "game/lives":
@@ -99,14 +105,22 @@ class LCD:
             if msg.topic == "game/isStarted":
                 self.is_started = msg.payload.decode()
 
-        client.subscribe("game/lives")
-        client.subscribe("game/isStarted")
+        client = mqtt_client.Client("manager")
         client.on_message = on_message
+        client.on_connect = on_connect
+        client.connect("10.4.1.43", 1883)
+        return client
+
+
 
     def run(self):
         client = self.connect_mqtt()
-        self.subscribe(client)
-        client.loop_forever()
+        threading.Thread(target=self.start_timer, args=(10, client)).start()
+        threading.Thread(target=self.loop, args=()).start()
+        while True:
+            client.loop_forever()
+
+
 
     def clear(self):
         self.lcd[0].clear()
