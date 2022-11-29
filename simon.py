@@ -10,11 +10,18 @@ green = 6
 blue = 26
 beeper = 18
 pwr_indicator = 27
+red_btn = 17
+yellow_btn = 5
+green_btn = 4
+blue_btn = 22
 pattern = []
+max_pattern_length = 2
 lights = [red, yellow, green, blue]
 module_is_active = False
-game = False
 server_ip_addr = "10.4.1.43"
+is_active_topic = "game/modules/Simon/isActive"
+fail_topic = "game/modules/Simon/Fail"
+success_topic = "game/modules/Simon/Success"
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
@@ -24,37 +31,60 @@ GPIO.setup(green, GPIO.OUT)
 GPIO.setup(blue, GPIO.OUT)
 GPIO.setup(beeper, GPIO.OUT)
 GPIO.setup(pwr_indicator, GPIO.OUT)
-GPIO.setup(17, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(22, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(red_btn, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(yellow_btn, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(green_btn, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(blue_btn, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.output(yellow, GPIO.LOW)
+GPIO.output(red, GPIO.LOW)
+GPIO.output(green, GPIO.LOW)
+GPIO.output(blue, GPIO.LOW)
+GPIO.output(pwr_indicator, GPIO.LOW)
+client = paho.Client(client_id="simon", clean_session=False)
+client.connect(server_ip_addr, 1883, 60)
 
 
-def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
-    client.subscribe("Game/Module/Simon/IsActive", qos=1)
-    client.subscribe("Game/Module/Simon/Fail", qos=1)
-    client.subscribe("Game/Module/Simon/Success", qos=1)
+def game_success():
+    x = 0
+    while x <= 5:
+        GPIO.output(blue, GPIO.HIGH)
+        time.sleep(0.05)
+        GPIO.output(blue, GPIO.LOW)
 
+        GPIO.output(yellow, GPIO.HIGH)
+        time.sleep(0.05)
+        GPIO.output(yellow, GPIO.LOW)
 
-def on_message(client, userdata, msg):
-    module_is_active = msg
-    print(module_is_active)
+        GPIO.output(red, GPIO.HIGH)
+        time.sleep(0.05)
+        GPIO.output(red, GPIO.LOW)
+
+        GPIO.output(green, GPIO.HIGH)
+        time.sleep(0.05)
+        GPIO.output(green, GPIO.LOW)
+
+        x = x + 1
 
 
 def game_over():
-    pattern.clear()
-    client.publish("game/modules/Simon/Fail", payload=True, qos=1, retain=True)
-    GPIO.output(blue, GPIO.HIGH)
-    GPIO.output(red, GPIO.HIGH)
-    GPIO.output(green, GPIO.HIGH)
-    GPIO.output(yellow, GPIO.HIGH)
-    time.sleep(3)
-    GPIO.output(blue, GPIO.LOW)
-    GPIO.output(red, GPIO.LOW)
-    GPIO.output(green, GPIO.LOW)
-    GPIO.output(yellow, GPIO.LOW)
-    GPIO.output(pwr_indicator, GPIO.LOW)
+    x = 0
+    while x <= 5:
+        GPIO.output(blue, GPIO.HIGH)
+        GPIO.output(red, GPIO.HIGH)
+        GPIO.output(green, GPIO.HIGH)
+        GPIO.output(yellow, GPIO.HIGH)
+        GPIO.output(beeper, GPIO.HIGH)
+        time.sleep(0.05)
+
+        GPIO.output(blue, GPIO.LOW)
+        GPIO.output(red, GPIO.LOW)
+        GPIO.output(green, GPIO.LOW)
+        GPIO.output(yellow, GPIO.LOW)
+        GPIO.output(pwr_indicator, GPIO.LOW)
+        GPIO.output(beeper, GPIO.LOW)
+        time.sleep(0.05)
+
+        x = x + 1
 
 
 def flash(color):
@@ -66,63 +96,71 @@ def flash(color):
     GPIO.output(lights[color], GPIO.LOW)
 
 
-client = paho.Client(client_id="simon", clean_session=False)
-client.on_connect = on_connect
-client.on_message = on_message
-client.connect(server_ip_addr, 1883, 60)
+def game():
+    alive = True
+    pattern.clear()
 
-GPIO.output(yellow, GPIO.LOW)
-GPIO.output(red, GPIO.LOW)
-GPIO.output(green, GPIO.LOW)
-GPIO.output(blue, GPIO.LOW)
-GPIO.output(pwr_indicator, GPIO.LOW)
+    while alive:
+        pattern.append(random.randint(0, 3))
+        print(pattern)
 
-while True:
-    module_is_active = str(sub.simple("game/modules/Simon/isActive", hostname=server_ip_addr).payload, "utf-8")
-    print(module_is_active)
+        if pattern.__len__() > max_pattern_length:
+            return True
 
-    if module_is_active == "True":
-        alive = True
-        GPIO.output(pwr_indicator, GPIO.HIGH)
+        for color in pattern:
+            flash(color)
 
-        while alive:
-            pattern.append(random.randint(0, 3))
-            print(pattern)
+        for color in pattern:
+            waiting_for_input = True
 
-            for color in pattern:
-                flash(color)
+            while waiting_for_input:
+                red_btn_state = GPIO.input(red_btn)
+                yellow_btn_state = GPIO.input(yellow_btn)
+                green_btn_state = GPIO.input(green_btn)
+                blue_btn_state = GPIO.input(blue_btn)
 
-            for color in pattern:
-                waitingForInput = True
+                if red_btn_state == 0:
+                    flash(color)
+                    waiting_for_input = False
+                    if color != 0:
+                        return False
 
-                while waitingForInput:
-                    redButtonState = GPIO.input(17)
-                    yellowButtonState = GPIO.input(5)
-                    greenButtonState = GPIO.input(4)
-                    blueButtonState = GPIO.input(22)
+                if yellow_btn_state == 0:
+                    flash(color)
+                    waiting_for_input = False
+                    if color != 1:
+                        return False
 
-                    if redButtonState == 0:
-                        flash(color)
-                        waitingForInput = False
-                        if color != 0:
-                            alive = False
+                if green_btn_state == 0:
+                    flash(color)
+                    waiting_for_input = False
+                    if color != 2:
+                        return False
 
-                    if yellowButtonState == 0:
-                        flash(color)
-                        waitingForInput = False
-                        if color != 1:
-                            alive = False
+                if blue_btn_state == 0:
+                    flash(color)
+                    waiting_for_input = False
+                    if color != 3:
+                        return False
 
-                    if greenButtonState == 0:
-                        flash(color)
-                        waitingForInput = False
-                        if color != 2:
-                            alive = False
 
-                    if blueButtonState == 0:
-                        flash(color)
-                        waitingForInput = False
-                        if color != 3:
-                            alive = False
+try:
+    while True:
+        module_is_active = str(sub.simple(is_active_topic, hostname=server_ip_addr).payload, "utf-8")
+        GPIO.output(pwr_indicator, GPIO.LOW)
 
-        game_over()
+        if module_is_active == "True":
+            GPIO.output(pwr_indicator, GPIO.HIGH)
+
+            if game():
+                game_success()
+                client.publish(success_topic, payload=True, qos=1, retain=True)
+                client.publish(is_active_topic, payload=False, qos=1, retain=True)
+            else:
+                game_over()
+                client.publish(fail_topic, payload=True, qos=1, retain=True)
+                client.publish(is_active_topic, payload=False, qos=1, retain=True)
+
+            time.sleep(0.5)
+finally:
+    GPIO.cleanup()
