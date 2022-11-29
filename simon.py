@@ -15,10 +15,13 @@ yellow_btn = 5
 green_btn = 4
 blue_btn = 22
 pattern = []
-max_pattern_length = 3
+max_pattern_length = 2
 lights = [red, yellow, green, blue]
 module_is_active = False
 server_ip_addr = "10.4.1.43"
+is_active_topic = "game/modules/Simon/isActive"
+fail_topic = "game/modules/Simon/Fail"
+success_topic = "game/modules/Simon/Success"
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
@@ -141,17 +144,23 @@ def game():
                         return False
 
 
-while True:
-    module_is_active = str(sub.simple("game/modules/Simon/isActive", hostname=server_ip_addr).payload, "utf-8")
-    GPIO.output(pwr_indicator, GPIO.LOW)
+try:
+    while True:
+        module_is_active = str(sub.simple(is_active_topic, hostname=server_ip_addr).payload, "utf-8")
+        GPIO.output(pwr_indicator, GPIO.LOW)
 
-    if module_is_active == "True":
-        GPIO.output(pwr_indicator, GPIO.HIGH)
+        if module_is_active == "True":
+            GPIO.output(pwr_indicator, GPIO.HIGH)
 
-        if game():
-            game_success()
-            client.publish("game/modules/Simon/Success", payload=True, qos=1, retain=True)
-            client.publish("game/modules/Simon/isActive", payload=False, qos=1, retain=True)
-        else:
-            game_over()
-            client.publish("game/modules/Simon/Fail", payload=True, qos=1, retain=True)
+            if game():
+                game_success()
+                client.publish(success_topic, payload=True, qos=1, retain=True)
+                client.publish(is_active_topic, payload=False, qos=1, retain=True)
+            else:
+                game_over()
+                client.publish(fail_topic, payload=True, qos=1, retain=True)
+                client.publish(is_active_topic, payload=False, qos=1, retain=True)
+
+            time.sleep(0.5)
+finally:
+    GPIO.cleanup()
