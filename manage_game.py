@@ -9,18 +9,17 @@ import GameManager
 import threading
 
 manager = GameManager.GameManager("10.4.1.43", 1883, [])
-manager.game_modules = ["Keypad", "Simon"]
+manager.game_modules = ["Keypad"]
 
 def start_game(input_choice):
-    if input_choice == "S":
+    if input_choice == "S" or input_choice == "s":
         print("Game has started. Timer set to 3 minutes!")
         print("Good luck!")
         manager.start_game()
         manager.manage_game()
-    elif input_choice == "E":
+    elif input_choice == "E" or input_choice == "e":
         print("Game has ended. Thanks for playing!")
         manager.end_game()
-        exit(0)
     else:
         print("Command not recognized.")
 
