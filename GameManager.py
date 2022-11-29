@@ -18,6 +18,7 @@ class GameManager:
         self.mqttc.publish("game/lives", 3, 1, True)
         self.mqttc.publish("game/isStarted", True, 1, True)
         self.mqttc.publish("game/timer", 180, 1, True)
+        self.mqttc.publish("game/hasBeenWon", False, 1, True)
         self.activate_module(self.game_modules[self.module_index])
         if len(self.game_modules) > 1:
             self.deactivate_module(self.game_modules[self.module_index + 1])
@@ -85,9 +86,10 @@ class GameManager:
             self.decrease_number_of_lives()
             path = "game/modules/" + module + "/Fail"
             self.mqttc.publish(path, False, 1, True)
+            self.activate_module(module)
 
     def win_module(self, module):
-        if self.module_index + 1 > len(self.game_modules):
+        if self.module_index + 1 == len(self.game_modules):
             self.win_game()
             return 0
         self.module_index += 1
@@ -95,9 +97,9 @@ class GameManager:
         self.activate_module(module)
 
     def win_game(self):
-        self.mqttc.publish("game/hasBeenWon", True, 2, True)
+        self.mqttc.publish("game/hasBeenWon", True, 1, True)
         print("Congratulations! You have won the game!")
-        self.end_game()
+        self.wait_for_new_game()
 
     def is_there_still_lives_left(self):
         number_of_lives = int(subscribe.simple("game/lives", hostname=self.broker_ip).payload)
@@ -109,3 +111,19 @@ class GameManager:
         if time_left <= 0:
             print("Out of time!")
             self.game_over()
+
+    def wait_for_new_game(self):
+        while True:
+            print("Do you want to start a new game? Y or N")
+            result = input()
+            print(result)
+            if result == "Y" or result == "y":
+                print("Starting new game!")
+                self.start_game()
+                break
+            elif result == "N" or result == "n":
+                print("Thanks for playing!")
+                self.end_game()
+                break
+            else:
+                print("Command not recognized")
