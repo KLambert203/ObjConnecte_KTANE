@@ -13,19 +13,21 @@ class GameManager:
 
     def start_game(self):
         self.connect_to_broker()
+        print("Game starting")
         self.mqttc.publish("game/hasBeenWon", False, 2, True)
         self.mqttc.publish("game/lives", 3, 1, True)
         self.mqttc.publish("game/isStarted", True, 1, True)
         self.mqttc.publish("game/timer", 180, 1, True)
         self.activate_module(self.game_modules[self.module_index])
-        self.deactivate_module(self.game_modules[self.module_index + 1])
+        if len(self.game_modules) > 1:
+            self.deactivate_module(self.game_modules[self.module_index + 1])
         for module in self.game_modules:
             path = "game/modules/" + module + "/Fail"
             self.mqttc.publish(path, False, 1, True)
 
     def end_game(self):
         self.connect_to_broker()
-        self.mqttc.publish("game/lives", 3, 1, True)
+        print("Game is ending")
         self.mqttc.publish("game/isStarted", False, 1, True)
         for module in self.game_modules:
             path = "game/modules/" + module + "/isActive"
@@ -39,15 +41,9 @@ class GameManager:
     def manage_game(self):
         while True:
             current_module = self.game_modules[self.module_index]
-            print("Checking number of lives")
-            if int(subscribe.simple("game/lives", hostname=self.broker_ip).payload) <= 0:
-                print("Out of lives")
-            print("Checking timer")
-            if int(subscribe.simple("game/timer", hostname=self.broker_ip).payload) <= 0:
-                print("Out of time")
-            print("Checking if current module is in failure")
+            self.is_there_still_lives_left()
+            self.is_there_still_time_left()
             self.is_module_in_failure(current_module)
-            print("Checking if current module has been won")
             self.has_module_been_won(current_module)
             time.sleep(0.5)
 
@@ -71,11 +67,11 @@ class GameManager:
     def decrease_number_of_lives(self):
         current_lives = int(subscribe.simple("game/lives", hostname=self.broker_ip).payload)
         updated_lives = current_lives - 1
+        print("updated_lives : " + str(updated_lives))
         self.mqttc.publish("game/lives", updated_lives, 1, True)
 
     def has_module_been_won(self, module):
         module_status = str(subscribe.simple("game/modules/" + module + "/Success", hostname=self.broker_ip).payload)
-        print(module_status)
         if module_status == "b'True'":
             self.win_module(module)
             path = "game/modules/" + module + "/Fail"
@@ -84,8 +80,8 @@ class GameManager:
     def is_module_in_failure(self, module):
         path = "game/modules/" + module + "/Fail"
         module_status = str(subscribe.simple(path, hostname=self.broker_ip).payload)
-        print(module_status)
         if module_status == "b'True'":
+            self.is_there_still_lives_left()
             self.decrease_number_of_lives()
             path = "game/modules/" + module + "/Fail"
             self.mqttc.publish(path, False, 1, True)
@@ -94,8 +90,6 @@ class GameManager:
         if self.module_index + 1 > len(self.game_modules):
             self.win_game()
             return 0
-        won_module = "game/modules/" + module + "/isActive"
-        new_module = "game/modules/" + self.game_modules[self.module_index + 1] + "/isActive"
         self.module_index += 1
         self.deactivate_module(module)
         self.activate_module(module)
@@ -104,3 +98,14 @@ class GameManager:
         self.mqttc.publish("game/hasBeenWon", True, 2, True)
         print("Congratulations! You have won the game!")
         self.end_game()
+
+    def is_there_still_lives_left(self):
+        number_of_lives = int(subscribe.simple("game/lives", hostname=self.broker_ip).payload)
+        if number_of_lives == 0:
+            self.game_over()
+
+    def is_there_still_time_left(self):
+        time_left = int(subscribe.simple("game/timer", hostname=self.broker_ip).payload)
+        if time_left <= 0:
+            print("Out of time!")
+            self.game_over()

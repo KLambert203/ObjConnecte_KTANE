@@ -9,7 +9,7 @@ import GameManager
 import threading
 
 manager = GameManager.GameManager("10.4.1.43", 1883, [])
-manager.game_modules = ["Simon", "Keypad"]
+manager.game_modules = ["Keypad", "Simon"]
 
 def start_game(input_choice):
     if input_choice == "S":
