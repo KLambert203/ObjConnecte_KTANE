@@ -8,6 +8,8 @@ import asyncio
 
 class LCD:
     def __init__(self):
+        self.is_Alive = True
+        self.is_Won = "False"
         self.lcd = self.init_chips()
         self.keypad = self.init_keypad()
         self.time_format = None
@@ -41,39 +43,56 @@ class LCD:
         cols_pins = [31, 33, 35, 37]
         return Keypad(keys, rows_pins, cols_pins, rows, cols)
 
-    def loop(self):
+    def loop(self, client):
+        self.clear()
         self.keypad.setDebounceTime(50)
         self.lcd[1].output(3, 1)
         self.lcd[0].begin(16, 2)
         string_array = []
-
         while True:
-            key = self.keypad.getKey()
+            if self.is_Alive is False:
+                break
 
-            self.lcd[0].setCursor(0, 0)
-            self.lcd[0].message(self.time_format)
-            self.lcd[0].message('\n' + "Enter code: ")
+            if self.is_Won == "False":
+                key = self.keypad.getKey()
 
-            if self.lives is not None:
-                self.lcd[0].setCursor(9, 0)
-                self.lcd[0].message(self.lives + " lives")
+                self.lcd[0].setCursor(0, 0)
+                self.lcd[0].message(self.time_format)
+                self.lcd[0].message('\n' + "Code: ")
 
-            if key != self.keypad.NULL:
-                string_array.append(str(key))
-                string = ""
-                for a in string_array:
-                    string += str(a)
-                self.lcd[0].message('\n' + "Enter code: " + string)
-                if str(key) == "#":
-                    if string == "1234#":
-                        print("win")
-                    self.lcd[0].clear()
-                    string_array.clear()
+                if self.lives is not None:
+                    self.lcd[0].setCursor(9, 0)
+                    self.lcd[0].message(self.lives + " lives")
+
+                if key != self.keypad.NULL:
+                    string_array.append(str(key))
                     string = ""
+                    for a in string_array:
+                        string += str(a)
+                    self.lcd[0].message('\n' + "Code: " + string)
+                    if str(key) == "#":
+                        if string == "82C2#":
+                            client.publish("game/modules/Keypad/Success", True, 1, True)
+                            print("win")
+
+                        else:
+                            client.publish("game/modules/Keypad/Fail", True, 1, True)
+                        self.lcd[0].clear()
+                        string_array.clear()
+                        string = ""
+
+            if self.is_Won == "True":
+                self.lcd[0].setCursor(0, 0)
+                self.lcd[0].message("Bomb defused !")
+
+        self.lcd[0].clear()
+        while True:
+            self.lcd[0].setCursor(0, 0)
+            self.lcd[0].message("Game over !")
 
     def start_timer(self, sec, client):
-        print(self.is_started)
-        while True:
+        while self.is_Alive is True and self.is_Won == "False":
+
             if self.is_started == "True":
                 while sec:
                     minute, second = divmod(sec, 60)
@@ -81,15 +100,23 @@ class LCD:
                     client.publish("game/timer", sec, 1, True)
                     time.sleep(1)
                     sec -= 1
+                    self.is_there_lives_left()
+                    if self.is_Alive is False or self.is_Won == "True" or self.is_started == "False":
+                        sec = 180
+                        break
                 if sec == 0:
                     print("termine")
                     self.time_format = '{:02d}:{:02d}'.format(0, 0)
                     client.publish("game/timer", 0, 1, True)
                     break
+
             else:
                 self.time_format = '--:--'
+        print("Exited timer thread")
 
-
+    def is_there_lives_left(self):
+        if self.lives == "0":
+            self.is_Alive = False
 
 
     def connect_mqtt(self):
@@ -97,30 +124,32 @@ class LCD:
             print("Connected with result code " + str(rc))
             client.subscribe("game/lives")
             client.subscribe("game/isStarted")
+            client.subscribe("game/hasBeenWon")
 
         def on_message(client, userdata, msg):
             print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
             if msg.topic == "game/lives":
                 self.lives = msg.payload.decode()
+
             if msg.topic == "game/isStarted":
                 self.is_started = msg.payload.decode()
 
-        client = mqtt_client.Client("manager")
+            if msg.topic == "game/hasBeenWon":
+                self.is_Won = msg.payload.decode()
+
+        client = mqtt_client.Client("keypad")
         client.on_message = on_message
         client.on_connect = on_connect
         client.connect("10.4.1.43", 1883)
         return client
 
-
-
     def run(self):
         client = self.connect_mqtt()
-        threading.Thread(target=self.start_timer, args=(10, client)).start()
-        threading.Thread(target=self.loop, args=()).start()
+        threading.Thread(target=self.start_timer, args=(180, client)).start()
+        threading.Thread(target=self.loop, args=(client,)).start()
+
         while True:
             client.loop_forever()
-
-
 
     def clear(self):
         self.lcd[0].clear()
