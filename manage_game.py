@@ -6,10 +6,10 @@
 # modification: 2018/08/03
 ########################################################################
 import GameManager
-import threading
+import time
 
 manager = GameManager.GameManager("10.4.1.43", 1883, [])
-manager.game_modules = ["Keypad"]
+manager.game_modules = ["Simon", "Keypad"]
 
 def start_game(input_choice):
     if input_choice == "S" or input_choice == "s":
@@ -38,4 +38,6 @@ if __name__ == '__main__':  # Program start from here
         loop()
         manager.end_game()
     except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, exit the program.
+        manager.end_game()
+        time.sleep(1)
         print("Game has ended")

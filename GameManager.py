@@ -1,5 +1,4 @@
 import paho.mqtt.client as paho
-import paho.mqtt.subscribe as subscribe
 import time
 
 
@@ -8,8 +7,14 @@ class GameManager:
         self.broker_ip = broker_ip
         self.listener_port = listener_port
         self.game_modules = game_modules
-        self.mqttc = paho.Client(client_id="manager", clean_session=False)
+        self.mqttc = None
         self.module_index = 0
+        self.time_left = 180
+        self.number_of_lives = 3
+        self.simon_failure = False
+        self.simon_success = False
+        self.keypad_failure = False
+        self.keypad_success = False
 
     def start_game(self):
         self.connect_to_broker()
@@ -25,14 +30,21 @@ class GameManager:
         for module in self.game_modules:
             path = "game/modules/" + module + "/Fail"
             self.mqttc.publish(path, False, 1, True)
+        self.module_index = 0
 
     def end_game(self):
         self.connect_to_broker()
         print("Game is ending")
         self.mqttc.publish("game/isStarted", False, 1, True)
+        self.mqttc.publish("game/hasBeenWon", False, 1, True)
         for module in self.game_modules:
-            path = "game/modules/" + module + "/isActive"
-            self.mqttc.publish(path, False, 1, True)
+            path1 = "game/modules/" + module + "/isActive"
+            path2 = "game/modules/" + module + "/Fail"
+            path3 = "game/modules/" + module + "/Success"
+            self.mqttc.publish(path1, False, 1, True)
+            self.mqttc.publish(path2, False, 1, True)
+            self.mqttc.publish(path3, False, 1, True)
+        time.sleep(1)
         exit(0)
 
     def game_over(self):
@@ -41,6 +53,7 @@ class GameManager:
 
     def manage_game(self):
         while True:
+            self.mqttc.loop()
             current_module = self.game_modules[self.module_index]
             self.is_there_still_lives_left()
             self.is_there_still_time_left()
@@ -48,7 +61,34 @@ class GameManager:
             self.has_module_been_won(current_module)
             time.sleep(0.5)
 
+    def on_connect(self, client, userdata, flags, rc):
+        #print("Connected with result code " + str(rc))
+        client.subscribe("game/modules/Simon/Fail")
+        client.subscribe("game/modules/Simon/Success")
+        client.subscribe("game/modules/Keypad/Fail")
+        client.subscribe("game/modules/Keypad/Success")
+        client.subscribe("game/timer")
+        client.subscribe("game/lives")
+
+    def on_message(self, client, userdata, msg):
+        print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
+        if msg.topic == "game/lives":
+            self.number_of_lives = int(msg.payload.decode())
+        if msg.topic == "game/timer":
+            self.time_left = int(msg.payload.decode())
+        if msg.topic == "game/modules/Simon/Fail":
+            self.simon_failure = msg.payload.decode()
+        if msg.topic == "game/modules/Keypad/Fail":
+            self.keypad_failure = msg.payload.decode()
+        if msg.topic == "game/modules/Simon/Success":
+            self.simon_success = msg.payload.decode()
+        if msg.topic == "game/modules/Keypad/Success":
+            self.keypad_success = msg.payload.decode()
+
     def connect_to_broker(self):
+        self.mqttc = paho.Client(client_id="manager", clean_session=False)
+        self.mqttc.on_message = self.on_message
+        self.mqttc.on_connect = self.on_connect
         self.mqttc.connect(self.broker_ip, port=self.listener_port, keepalive=60, bind_address="")
 
     def activate_module(self, module):
@@ -66,27 +106,40 @@ class GameManager:
         self.mqttc.publish(path2, False, 1, True)
 
     def decrease_number_of_lives(self):
-        current_lives = int(subscribe.simple("game/lives", hostname=self.broker_ip).payload)
-        updated_lives = current_lives - 1
-        print("updated_lives : " + str(updated_lives))
+        updated_lives = self.number_of_lives - 1
         self.mqttc.publish("game/lives", updated_lives, 1, True)
 
     def has_module_been_won(self, module):
-        module_status = str(subscribe.simple("game/modules/" + module + "/Success", hostname=self.broker_ip).payload)
-        if module_status == "b'True'":
-            self.win_module(module)
-            path = "game/modules/" + module + "/Fail"
-            self.mqttc.publish(path, False, 1, True)
+        if module == "Simon":
+            if self.simon_success == "True":
+                self.win_module(module)
+                path = "game/modules/" + module + "/Fail"
+                self.mqttc.publish(path, False, 1, True)
+        elif module == "Keypad":
+            if self.keypad_success == "True":
+                self.win_module(module)
+                path = "game/modules/" + module + "/Fail"
+                self.mqttc.publish(path, False, 1, True)
+        else:
+            print("Erreur: aucun nom de module")
 
     def is_module_in_failure(self, module):
-        path = "game/modules/" + module + "/Fail"
-        module_status = str(subscribe.simple(path, hostname=self.broker_ip).payload)
-        if module_status == "b'True'":
-            self.is_there_still_lives_left()
-            self.decrease_number_of_lives()
-            path = "game/modules/" + module + "/Fail"
-            self.mqttc.publish(path, False, 1, True)
-            self.activate_module(module)
+        if module == "Simon":
+            if self.simon_failure == "True":
+                self.is_there_still_lives_left()
+                self.decrease_number_of_lives()
+                path = "game/modules/" + module + "/Fail"
+                self.mqttc.publish(path, False, 1, True)
+                self.activate_module(module)
+        elif module == "Keypad":
+            if self.keypad_failure == "True":
+                self.is_there_still_lives_left()
+                self.decrease_number_of_lives()
+                path = "game/modules/" + module + "/Fail"
+                self.mqttc.publish(path, False, 1, True)
+                self.activate_module(module)
+        else:
+            print("Erreur: aucun nom de module")
 
     def win_module(self, module):
         if self.module_index + 1 == len(self.game_modules):
@@ -94,7 +147,7 @@ class GameManager:
             return 0
         self.module_index += 1
         self.deactivate_module(module)
-        self.activate_module(module)
+        self.activate_module(self.game_modules[self.module_index])
 
     def win_game(self):
         self.mqttc.publish("game/hasBeenWon", True, 1, True)
@@ -102,21 +155,19 @@ class GameManager:
         self.wait_for_new_game()
 
     def is_there_still_lives_left(self):
-        number_of_lives = int(subscribe.simple("game/lives", hostname=self.broker_ip).payload)
-        if number_of_lives == 0:
+        if self.number_of_lives == 0:
             self.game_over()
 
     def is_there_still_time_left(self):
-        time_left = int(subscribe.simple("game/timer", hostname=self.broker_ip).payload)
-        if time_left <= 0:
+        if self.time_left <= 0:
             print("Out of time!")
             self.game_over()
 
     def wait_for_new_game(self):
+        self.mqttc.publish("game/isStarted", False, 1, True)
         while True:
             print("Do you want to start a new game? Y or N")
             result = input()
-            print(result)
             if result == "Y" or result == "y":
                 print("Starting new game!")
                 self.start_game()
