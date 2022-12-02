@@ -18,6 +18,16 @@ Quelques initialisations doivent être configuré pour le bon fonctionnement du 
 ### LCD_Service.py
 Le script LCD_Service est un script contenant une seul classe nommé LCD, elle contient la fonction init_chips qui initialise et retourne le nécessaire pour utiliser le LCD. Elle contient également la fonction init_keypad qui contient le nécessaire pour le bon fonctionnement du keypad. La fonction connect_mqtt permet de se connecter au serveur MQTT puis recevoir des données du serveur à l'aide d'abonnement. La fonction start_timer créer un timer avec le temps voulu et envoie à chaque seconde le temps restant au serveur. La fonction loop est la fonction principale qui permet d'afficher sur le LCD toutes les informations pertinente en rapport au jeu. Elle affiche le temps restant, le nombre de vie et le code entré par l'utilisateur pour défuser la bombe. Finalement la fonction run ouvre plusieurs threads roulant en parallèle les fonctions start_timer, loop et le loop_forever du client MQTT. C'est la fonction run qui est appelé par le script main.py.
 ## Simon Says
+1. Installez PyCharm sur un Raspberry Pi
+2. Créez un nouveau projet PyCharm
+3. Lors de la création, décochez `Create a main.py welcome script`
+4. Déplacez le script `simon.py` et le fichier `requirements_simon.txt` dans la racine de votre projet
+6. Ajoutez une nouvelle configuration d'exécution (Alt-u) --> Edit configurations --> Add new run configuration (Alt-insert) --> Python --> Script path: `simon.py` --> OK
+7. Ouvrez le terminal dans PyCharm (Alt-F12)
+8. Exécutez la commande suivant : `pip install < requirements_simon.py`
+9. Spécifiez l'addresse IP de votre serveur MQTT dans la variable `server_ip_addr` (Par défaut, la valeur est `10.4.1.43`)
+10. Branchez Simon dans le GPIO10. 
+11. Exécutez le script (Maj-F10)
 ## GameManager
 
 
