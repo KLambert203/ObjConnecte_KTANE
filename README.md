@@ -26,7 +26,7 @@ Le script LCD_Service est un script contenant une seul classe nommé LCD, elle c
 7. Ouvrez le terminal dans PyCharm (Alt-F12)
 8. Exécutez la commande suivant : `pip install < requirements_simon.py`
 9. Spécifiez l'addresse IP de votre serveur MQTT dans la variable `server_ip_addr` (Par défaut, la valeur est `10.4.1.43`)
-10. Branchez Simon dans le GPIO10. 
+10. Branchez Simon dans le GPIO 
 11. Exécutez le script (Maj-F10)
 ## GameManager
 
