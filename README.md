@@ -3,6 +3,7 @@ Keep Talking and Nobody Explodes, sauf que vous manipulez la bombe dans la vraie
 
 ## Matériel requis
 - 2 Raspberry Pi
+- 1 ordinateur Windows ou un 3e Raspberri Pi
 - 3 platines d'expérimentations (breadboards)
 - Les montages sont assemblés à l'aide du contenu de cette trousse : [Freenove Starter Kit](https://github.com/Freenove/Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi)
   - Montage "Simon"
@@ -44,3 +45,32 @@ pip install < requirements_simon.py
 11. Exécutez le script (Maj-F10)
 
 ## GameManager
+Le module GameManager est l'ensemble qui contrôle la partie. Il contient deux scripts: manage_game.py et GameManager.py
+
+### manage_game.py
+C'est le script de gestion de la partie. Nous devons l'ajouter comme une configuration de démarrage de l'interpréteur Python pour l'exécuter. Il utilise la classe Game_Manager.py pour écrire et lire les informations du serveur MQTT. C'est dans ce script que nous pourrons configurer l'adresse IP et le port du serveur, en plus des modules connectés au jeu. Présentement, le jeu ne supporte pas de modules supplémentaires, mais ceci est une option dans le futur.
+
+Pour changer les valeurs de l'adresse IP et des modules, seulement ajuster les valeurs dans les lignes 
+```
+manager = GameManager.GameManager("10.4.1.43", 1883, [])
+manager.game_modules = ["Simon", "Keypad"]
+```
+
+Il est important de seulement changer l'adresse IP et le numéro de port si tel est le cas, puisque la librairie Paho-MQTT ne s'attends qu'à ces options.
+Advenant le cas que vous ajoutiez un nouveau module au jeu, il est important de l'ajouter avec son nom en string séparé par une virgule des autres. Le serveur MQTT utilise ce nom pour générer les sujets à l'écriture.
+
+#### Utilisation
+Lors du démarrage du script, la console questionnera l'utilisateur pour définir la prochaine action. S ou s commencera la partie et E ou e terminera la partie. Tout autre commande retournera une erreur.
+
+Au départ de la partie, le script appelle les méthodes `start_game()` et `manage_game()` du GameManager. Celles-ci s'occupe de lire et écrire les informations pertinentes de la partie. Une fois que le Manager détecte un échec ou une victoire, il demandera à l'utilisateur s'il veut recommencer une partie ou terminer. Dans la 2e option, le Manager remettra les valeurs par défaut au niveau du serveur et terminera l'exécution.
+
+### GameManager.py
+Ceci est le script qui applique la gestion concrètement. Il n'a pas à être configuré comme script de démarrage, mais il doit être dans le projet puisque manage_game.py importe la classe. Pour le bon fonctionnement de cette classe, nous devons installer le module paho-mqtt dans l'environnement virtuel. Pour ce faire :
+```
+pip install paho-mqtt
+```
+
+Le script manage_game.py instancie la classe avec les informations du serveur et des modules. Dans son constructeur, il remet les valeurs du jeu aux valeurs par défaut. Il serait possible ici de changer le temps alloué au joueur en changeant la valeur de la ligne `self.time_left = 180`. Les autres valeurs doivent rester inchangées.
+
+#### Utilisation
+Aucune manipulation n'est à faire ici. Le script s'exécute en boucle infinie jusqu'à ce qu'une défaite ou une victoire soit détectée. À la fin d'une partie, le joueur sera questionné s'il veut recommencer une partie ou terminer. Il est possible de répondre Y/y pour recommencer, ou N/n pour terminer.
