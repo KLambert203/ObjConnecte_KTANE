@@ -71,7 +71,6 @@ class GameManager:
         client.subscribe("game/lives")
 
     def on_message(self, client, userdata, msg):
-        print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
         if msg.topic == "game/lives":
             self.number_of_lives = int(msg.payload.decode())
         if msg.topic == "game/timer":
